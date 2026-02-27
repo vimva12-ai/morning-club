@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /members/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == uid;
+    }
+    match /attendance/{uid}/records/{date} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == uid;
+    }
+    match /feed/{date}/entries/{uid} {
+      allow read: if request.auth != null;
+      // 본인: 생성·삭제·전체 수정 가능
+      allow create, delete: if request.auth.uid == uid;
+      // 모든 멤버: 반응(r0~r3) 업데이트 가능 (본인 포함)
+      allow update: if request.auth != null;
+    }
+  }
+}

@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌅 새벽 6시 모임</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{--peach:#FFB347;--sunrise:#FF8C69;--mint:#98D8C8;--lavender:#C8A8E9;--cream:#FFF8F0;--text:#5C4A3A;--sub:#A08070;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;}
+
+  #authScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;padding:20px;background:linear-gradient(135deg,#FFE0B2,#FFF3E0 40%,#E3F2FD);}
+  .auth-card{background:white;border-radius:24px;padding:48px 40px;text-align:center;
+    box-shadow:0 8px 32px rgba(255,140,105,.15);max-width:400px;width:100%;}
+  .auth-emoji{font-size:64px;margin-bottom:16px;}
+  .auth-title{font-size:26px;font-weight:800;color:var(--sunrise);margin-bottom:8px;}
+  .auth-sub{color:var(--sub);margin-bottom:32px;line-height:1.6;}
+  .btn-google{display:flex;align-items:center;justify-content:center;gap:12px;
+    background:white;border:2px solid #E0E0E0;border-radius:50px;padding:14px 28px;
+    font-size:16px;font-weight:600;color:#444;cursor:pointer;width:100%;transition:all .2s;}
+  .btn-google:hover{border-color:var(--sunrise);box-shadow:0 4px 12px rgba(255,140,105,.2);transform:translateY(-1px);}
+  .btn-google img{width:22px;}
+
+  #app{display:none;}
+  header{background:linear-gradient(135deg,var(--sunrise),var(--peach));padding:16px 20px;
+    display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(255,140,105,.3);}
+  .header-title{color:white;font-size:20px;font-weight:800;}
+  .header-date{color:rgba(255,255,255,.85);font-size:13px;}
+  .user-info{display:flex;align-items:center;gap:8px;}
+  .btn-logout{background:rgba(255,255,255,.2);border:none;color:white;padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;}
+  .btn-logout:hover{background:rgba(255,255,255,.35);}
+  nav{display:flex;background:white;border-bottom:1px solid #F0E8E0;}
+  .nav-btn{flex:1;padding:14px;border:none;background:none;color:var(--sub);font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;}
+  .nav-btn.active{color:var(--sunrise);border-bottom-color:var(--sunrise);}
+  main{max-width:700px;margin:0 auto;padding:20px 16px;}
+  .section-title{font-size:18px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+  .tab{display:none;} .tab.active{display:block;}
+  .firebase-notice{background:#FFF3CD;border:1px solid #FFECB5;border-radius:12px;
+    padding:14px 16px;margin-bottom:20px;font-size:13px;color:#856404;line-height:1.6;}
+
+  /* TODAY */
+  .today-status{background:white;border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:20px;}
+  .day-badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .day-badge{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;}
+  .day-badge.required{background:#FFE0B2;color:#E65100;}
+  .day-badge.optional{background:#E8F5E9;color:#2E7D32;}
+  .day-badge.today{background:var(--sunrise);color:white;}
+  .attendance-form{background:var(--cream);border-radius:16px;padding:16px;}
+  .form-label{font-size:14px;font-weight:700;margin-bottom:8px;}
+  textarea{width:100%;border:2px solid #F0E8E0;border-radius:12px;padding:12px;font-size:14px;resize:none;font-family:inherit;background:white;transition:border-color .2s;}
+  textarea:focus{outline:none;border-color:var(--peach);}
+
+  /* 공개/비공개 토글 */
+  .privacy-row{display:flex;align-items:center;justify-content:space-between;
+    margin-top:12px;padding:10px 14px;background:white;border-radius:12px;border:2px solid #F0E8E0;}
+  .privacy-label{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;}
+  .toggle-wrap{display:flex;align-items:center;gap:8px;}
+  .toggle-text{font-size:13px;color:var(--sub);font-weight:600;}
+  .toggle{position:relative;width:44px;height:24px;cursor:pointer;}
+  .toggle input{opacity:0;width:0;height:0;position:absolute;}
+  .toggle-slider{position:absolute;inset:0;background:#E0D8D0;border-radius:12px;transition:.3s;}
+  .toggle-slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;
+    background:white;border-radius:50%;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+  .toggle input:checked+.toggle-slider{background:var(--sunrise);}
+  .toggle input:checked+.toggle-slider:before{transform:translateX(20px);}
+
+  .btn-primary{width:100%;margin-top:12px;padding:14px;border:none;border-radius:50px;
+    background:linear-gradient(135deg,var(--sunrise),var(--peach));color:white;
+    font-size:16px;font-weight:800;cursor:pointer;transition:all .2s;box-shadow:0 4px 12px rgba(255,140,105,.3);}
+  .btn-primary:hover{transform:translateY(-2px);}
+  .checked-in-badge{background:linear-gradient(135deg,#A8E6CF,#98D8C8);color:#1B5E20;
+    padding:14px;border-radius:50px;text-align:center;font-weight:800;font-size:16px;}
+
+  /* MEMBER CARD */
+  .member-card{background:white;border-radius:20px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;}
+  .member-avatar-placeholder{width:48px;height:48px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:22px;background:linear-gradient(135deg,#FFE0B2,#FFCCBC);}
+  .member-info{flex:1;}
+  .member-name{font-weight:700;font-size:15px;}
+  .member-time{font-size:12px;color:var(--sub);margin-top:2px;}
+  .member-log{font-size:14px;color:var(--text);margin-top:8px;line-height:1.5;background:var(--cream);padding:10px 14px;border-radius:12px;position:relative;}
+  .member-badge{font-size:12px;padding:3px 10px;border-radius:20px;font-weight:700;}
+  .badge-present{background:#E8F5E9;color:#2E7D32;}
+  .badge-absent{background:#FFF3E0;color:#E65100;}
+  .private-badge{background:#F3E5F5;color:#7B1FA2;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
+  .card-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;}
+  .btn-sm{padding:5px 12px;border:none;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;}
+  .btn-edit{background:#FFF3E0;color:#E65100;}
+  .btn-edit:hover{background:#FFE0B2;}
+  .btn-delete{background:#FBE9E7;color:#C62828;}
+  .btn-delete:hover{background:#FFCDD2;}
+  .btn-privacy{background:#F3E5F5;color:#7B1FA2;}
+  .btn-privacy:hover{background:#E1BEE7;}
+
+  /* STATS */
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+  .stat-card{background:white;border-radius:20px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);text-align:center;}
+  .stat-emoji{font-size:28px;margin-bottom:6px;}
+  .stat-value{font-size:28px;font-weight:900;color:var(--sunrise);}
+  .stat-label{font-size:12px;color:var(--sub);margin-top:4px;}
+  .chart-card{background:white;border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:20px;}
+  .compare-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .compare-label{font-size:13px;color:var(--sub);width:60px;}
+  .compare-bar-wrap{flex:1;height:20px;background:#F5F0EA;border-radius:10px;overflow:hidden;}
+  .compare-bar{height:100%;border-radius:10px;transition:width .8s ease;}
+  .compare-pct{font-size:13px;font-weight:700;width:40px;text-align:right;}
+  .rank-card{background:white;border-radius:20px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:14px;display:flex;align-items:center;gap:14px;}
+  .rank-num{font-size:22px;font-weight:900;width:32px;text-align:center;}
+  .rank-bar-wrap{flex:1;}
+  .rank-name{font-weight:700;font-size:14px;margin-bottom:6px;}
+  .rank-bar-bg{height:10px;background:#F5F0EA;border-radius:5px;overflow:hidden;}
+  .rank-bar-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--sunrise),var(--peach));transition:width .8s ease;}
+  .rank-pct{font-size:14px;font-weight:800;color:var(--sunrise);}
+
+  /* 상세 통계 버튼 */
+  .btn-detail{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--sunrise),var(--peach));
+    color:white;border:none;border-radius:50px;padding:10px 20px;font-size:14px;font-weight:700;
+    cursor:pointer;margin-bottom:20px;box-shadow:0 4px 12px rgba(255,140,105,.3);transition:all .2s;}
+  .btn-detail:hover{transform:translateY(-2px);}
+
+  /* 상세 통계 패널 */
+  .detail-panel{background:white;border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:20px;}
+  .date-range-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+  .date-input{border:2px solid #F0E8E0;border-radius:12px;padding:8px 12px;font-size:14px;font-family:inherit;color:var(--text);background:white;}
+  .date-input:focus{outline:none;border-color:var(--peach);}
+  .btn-range{padding:8px 18px;border:none;border-radius:50px;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;background:#F5F0EA;color:var(--text);}
+  .btn-range.active,.btn-range:hover{background:linear-gradient(135deg,var(--sunrise),var(--peach));color:white;}
+  .preset-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+  .detail-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+  .detail-sum-card{background:var(--cream);border-radius:14px;padding:12px;text-align:center;}
+  .detail-sum-val{font-size:22px;font-weight:900;color:var(--sunrise);}
+  .detail-sum-label{font-size:11px;color:var(--sub);margin-top:2px;}
+  .detail-log-list{max-height:240px;overflow-y:auto;}
+  .detail-log-row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #F5F0EA;}
+  .detail-log-row:last-child{border-bottom:none;}
+  .detail-log-date{font-size:12px;color:var(--sub);min-width:80px;padding-top:2px;}
+  .detail-log-text{font-size:14px;flex:1;}
+  .detail-log-priv{font-size:11px;color:#9C27B0;margin-left:6px;}
+
+  /* PROFILE */
+  .profile-card{background:white;border-radius:20px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:16px;text-align:center;}
+  .profile-big-emoji{font-size:64px;margin-bottom:12px;}
+  .profile-name{font-size:22px;font-weight:800;margin-bottom:4px;}
+  .profile-email{font-size:14px;color:var(--sub);margin-bottom:20px;}
+  .btn-outline{padding:10px 24px;border:2px solid var(--sunrise);border-radius:50px;background:white;color:var(--sunrise);font-size:14px;font-weight:700;cursor:pointer;margin:4px;}
+  .btn-outline:hover{background:#FFF3E0;}
+  .admin-badge{background:linear-gradient(135deg,var(--lavender),#B39DDB);color:white;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;margin-left:6px;}
+  .admin-section{background:white;border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:16px;}
+  .admin-member-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #F5F0EA;}
+  .admin-member-row:last-child{border-bottom:none;}
+  .btn-kick{padding:5px 12px;border:none;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#FBE9E7;color:#C62828;}
+  .invite-box{background:var(--cream);border-radius:12px;padding:14px;margin-top:12px;}
+  .invite-link{font-size:12px;color:var(--sub);word-break:break-all;margin:8px 0;}
+  .btn-copy{padding:6px 16px;border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;background:linear-gradient(135deg,var(--sunrise),var(--peach));color:white;}
+
+  /* MODAL */
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;padding:20px;}
+  .modal-bg.open{display:flex;}
+  .modal{background:white;border-radius:24px;padding:28px;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.15);}
+  .modal-title{font-size:18px;font-weight:800;margin-bottom:20px;}
+  .modal-input{width:100%;border:2px solid #F0E8E0;border-radius:12px;padding:12px;font-size:15px;font-family:inherit;margin-bottom:12px;}
+  .modal-input:focus{outline:none;border-color:var(--peach);}
+  .emoji-picker{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+  .emoji-opt{font-size:24px;padding:8px;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:all .2s;}
+  .emoji-opt:hover,.emoji-opt.selected{border-color:var(--sunrise);background:#FFF3E0;}
+  .modal-btns{display:flex;gap:10px;margin-top:4px;}
+  .btn-cancel{flex:1;padding:12px;border:2px solid #E0D8D0;border-radius:50px;background:white;color:var(--sub);font-size:15px;font-weight:700;cursor:pointer;}
+  .btn-confirm{flex:1;padding:12px;border:none;border-radius:50px;background:linear-gradient(135deg,var(--sunrise),var(--peach));color:white;font-size:15px;font-weight:700;cursor:pointer;}
+
+  /* DARK MODE TOGGLE */
+  .btn-dark-toggle{background:rgba(255,255,255,.2);border:none;color:white;padding:6px 10px;border-radius:20px;cursor:pointer;font-size:16px;margin-right:4px;}
+  .btn-dark-toggle:hover{background:rgba(255,255,255,.35);}
+
+  /* DARK MODE OVERRIDES */
+  body.dark{--cream:#1A1A2E;--text:#E8D5C4;--sub:#A08070;background:#1A1A2E;}
+  body.dark header{background:linear-gradient(135deg,#2D1B4E,#1A3A5C);}
+  body.dark .member-card,body.dark .today-status,body.dark .stat-card,body.dark .chart-card,
+  body.dark .detail-panel,body.dark .rank-card,body.dark .profile-card,
+  body.dark .admin-section,body.dark .modal{background:#252540;}
+  body.dark nav{background:#1E1E35;border-bottom-color:#333355;}
+  body.dark .nav-btn{color:#A08070;}
+  body.dark .nav-btn.active{color:var(--peach);border-bottom-color:var(--peach);}
+  body.dark .attendance-form{background:#1E1E35;}
+  body.dark textarea,body.dark .modal-input,body.dark .date-input{background:#252540;color:#E8D5C4;border-color:#333355;}
+  body.dark .privacy-row{background:#252540;border-color:#333355;}
+  body.dark .detail-sum-card{background:#1E1E35;}
+  body.dark .rank-bar-bg,body.dark .compare-bar-wrap{background:#333355;}
+  body.dark .detail-log-row{border-bottom-color:#333355;}
+  body.dark .member-log{background:#1E1E35;}
+  body.dark .firebase-notice{background:#2A2A1A;border-color:#555530;color:#C0B070;}
+  body.dark .btn-cancel{background:#252540;color:#A08070;border-color:#333355;}
+  body.dark .invite-box{background:#1E1E35;}
+  body.dark .auth-card{background:#252540;}
+
+  /* PROFILE PHOTO */
+  .avatar-img{width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.7);display:block;}
+  .profile-avatar-img{width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--peach);margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;}
+
+  /* STREAK BADGE (profile) */
+  .streak-badge{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#FF8C69,#FFB347);color:white;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700;margin-bottom:8px;}
+
+  /* BADGE SHELF */
+  .badge-shelf{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px;}
+  .badge-pill{display:inline-flex;align-items:center;gap:4px;background:#FFF3E0;color:#E65100;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:700;white-space:nowrap;}
+  body.dark .badge-pill{background:#2A1A0A;color:#FFB347;}
+
+  /* REACTIONS */
+  .reaction-bar{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+  .btn-reaction{background:#F5F0EA;border:2px solid transparent;border-radius:20px;padding:5px 12px;font-size:13px;cursor:pointer;transition:all .2s;font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+  .btn-reaction:hover{border-color:var(--peach);}
+  .btn-reaction.active{background:#FFF3E0;border-color:var(--sunrise);}
+  body.dark .btn-reaction{background:#252540;color:#E8D5C4;}
+  body.dark .btn-reaction.active{background:#2A1A0A;border-color:var(--peach);}
+</style>
+</head>
+<body>
+
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-emoji">🌅</div>
+    <div class="auth-title">새벽 6시 모임</div>
+    <div class="auth-sub">매일 아침 함께 성장하는 우리 🌱<br>구글 계정으로 간편하게 시작하세요</div>
+    <button class="btn-google" onclick="handleGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+      Google로 로그인
+    </button>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div>
+      <div class="header-title">🌅 새벽 6시 모임</div>
+      <div class="header-date" id="headerDate"></div>
+    </div>
+    <div class="user-info">
+      <button class="btn-dark-toggle" onclick="toggleDark()" id="darkToggleBtn">🌙</button>
+      <div style="font-size:28px;cursor:pointer" onclick="switchTab('profile',document.querySelectorAll('.nav-btn')[3])" id="headerEmoji">🌟</div>
+      <button class="btn-logout" onclick="handleLogout()">로그아웃</button>
+    </div>
+  </header>
+  <nav>
+    <button class="nav-btn active" onclick="switchTab('today',this)">📋 오늘</button>
+    <button class="nav-btn" onclick="switchTab('feed',this)">👥 멤버</button>
+    <button class="nav-btn" onclick="switchTab('stats',this)">📊 통계</button>
+    <button class="nav-btn" onclick="switchTab('profile',this)">⚙️ 내 정보</button>
+  </nav>
+
+  <main>
+    <!-- TODAY -->
+    <div id="tab-today" class="tab active">
+      <div class="firebase-notice" style="background:#E8F5E9;border-color:#A5D6A7;color:#2E7D32">✅ <strong>Firestore 연결됨</strong> — 출석 데이터가 실시간으로 저장·동기화됩니다.</div>
+      <div class="today-status">
+        <div class="section-title">📅 오늘의 출석</div>
+        <div class="day-badges" id="dayBadges"></div>
+        <div id="attendanceArea"></div>
+      </div>
+      <div class="section-title">📝 오늘의 피드</div>
+      <div id="todayFeed"></div>
+    </div>
+
+    <!-- FEED -->
+    <div id="tab-feed" class="tab">
+      <div class="section-title">👥 전체 멤버 활동</div>
+      <div id="memberFeed"></div>
+    </div>
+
+    <!-- STATS -->
+    <div id="tab-stats" class="tab">
+      <div class="stats-grid" id="statsGrid"></div>
+
+      <!-- 상세 통계 버튼 -->
+      <button class="btn-detail" onclick="toggleDetail()">
+        <span>🔍</span><span id="detailBtnText">내 상세 통계 보기</span>
+      </button>
+
+      <!-- 상세 통계 패널 -->
+      <div class="detail-panel" id="detailPanel" style="display:none">
+        <div class="section-title">🔍 기간별 상세 통계</div>
+        <div class="preset-btns">
+          <button class="btn-range active" id="preset-7" onclick="setPreset(7,this)">최근 7일</button>
+          <button class="btn-range" id="preset-14" onclick="setPreset(14,this)">최근 2주</button>
+          <button class="btn-range" id="preset-30" onclick="setPreset(30,this)">최근 30일</button>
+          <button class="btn-range" id="preset-0" onclick="setPreset(0,this)">직접 설정</button>
+        </div>
+        <div class="date-range-row" id="customDateRow" style="display:none">
+          <input type="date" class="date-input" id="dateFrom">
+          <span style="color:var(--sub);font-weight:700">~</span>
+          <input type="date" class="date-input" id="dateTo">
+          <button class="btn-range active" onclick="applyCustomRange()">조회</button>
+        </div>
+        <div class="detail-summary" id="detailSummary"></div>
+        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📆 기간 내 출석 기록</div>
+        <div class="detail-log-list" id="detailLogList"></div>
+        <canvas id="detailChart" height="160" style="margin-top:16px"></canvas>
+      </div>
+
+      <div class="chart-card">
+        <div class="section-title">📈 주간 출석률 비교</div>
+        <canvas id="weekChart" height="160"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="section-title">🗓️ 이번 달 vs 지난 달</div>
+        <div id="compareSection"></div>
+      </div>
+      <div class="section-title">🏆 출석 랭킹</div>
+      <div id="rankingSection"></div>
+    </div>
+
+    <!-- PROFILE -->
+    <div id="tab-profile" class="tab">
+      <div class="profile-card">
+        <div class="profile-big-emoji" id="profileEmoji">🌟</div>
+        <div class="profile-name" id="profileName">나 (데모)</div>
+        <div id="profileStreak"></div>
+        <div class="profile-email" id="profileEmail">demo@gmail.com</div>
+        <div class="badge-shelf" id="badgeShelf"></div>
+        <div>
+          <button class="btn-outline" onclick="openBadgeList()">🏅 뱃지 목록 보기</button>
+        </div>
+        <div>
+          <button class="btn-outline" onclick="openEditProfile()">✏️ 닉네임 변경</button>
+          <button class="btn-outline" onclick="openEditEmoji()">😊 이모지 변경</button>
+        </div>
+      </div>
+      <div class="section-title">📋 내 출석 기록</div>
+      <div id="myRecords"></div>
+      <div id="adminSection" style="display:none">
+        <div class="section-title">👑 모임장 관리 <span class="admin-badge">모임장 전용</span></div>
+        <div class="admin-section">
+          <div style="font-weight:700;margin-bottom:12px;">멤버 목록</div>
+          <div id="adminMemberList"></div>
+          <div class="invite-box">
+            <div style="font-weight:700;font-size:14px;">🔗 초대 링크</div>
+            <div class="invite-link" id="inviteLink">초대 링크를 생성하려면 아래 버튼을 눌러주세요</div>
+            <button class="btn-copy" onclick="generateInvite()">링크 생성</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 닉네임 모달 -->
+<div class="modal-bg" id="modalName">
+  <div class="modal">
+    <div class="modal-title">✏️ 닉네임 변경</div>
+    <input class="modal-input" id="nameInput" placeholder="새 닉네임 입력" maxlength="12">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modalName')">취소</button>
+      <button class="btn-confirm" onclick="saveName()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이모지 모달 -->
+<div class="modal-bg" id="modalEmoji">
+  <div class="modal">
+    <div class="modal-title">😊 프로필 이모지 변경</div>
+    <div class="emoji-picker" id="emojiPicker"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modalEmoji')">취소</button>
+      <button class="btn-confirm" onclick="saveEmoji()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 일지 수정 모달 -->
+<div class="modal-bg" id="modalEditLog">
+  <div class="modal">
+    <div class="modal-title">📝 일지 수정</div>
+    <textarea class="modal-input" id="editLogInput" rows="3" placeholder="수정할 내용 입력"></textarea>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modalEditLog')">취소</button>
+      <button class="btn-confirm" onclick="saveEditLog()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div class="modal-bg" id="modalDelete">
+  <div class="modal">
+    <div class="modal-title">🗑️ 출석 기록 삭제</div>
+    <p style="color:var(--sub);line-height:1.6;margin-bottom:20px">이 날의 출석 기록과 일지를 삭제할까요?<br>삭제 후에는 되돌릴 수 없어요.</p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modalDelete')">취소</button>
+      <button class="btn-confirm" style="background:linear-gradient(135deg,#EF5350,#E53935)" onclick="confirmDelete()">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- 뱃지 목록 모달 -->
+<div class="modal-bg" id="modalBadges">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">🏅 뱃지 목록</div>
+    <div id="badgeListContent" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="modal-btns">
+      <button class="btn-confirm" onclick="closeModal('modalBadges')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Firebase 초기화 ----
+const firebaseConfig={
+  apiKey:"AIzaSyDIpHPhh3TzU77KboUZE1URFol6vawrZoM",
+  authDomain:"monring-club.firebaseapp.com",
+  projectId:"monring-club",
+  storageBucket:"monring-club.firebasestorage.app",
+  messagingSenderId:"58707870941",
+  appId:"1:58707870941:web:cd7bdfdfc58686534d0734"
+};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth();
+const provider=new firebase.auth.GoogleAuthProvider();
+const db=firebase.firestore();
+
+const EMOJIS=["🌟","🦁","🐰","🦊","🐸","🐼","🦋","🌸","🌈","🔥","⚡","🎯","🚀","🍀","🌻","🐯","🦅","🐬","🦄","🎸"];
+const DAYS=["일","월","화","수","목","금","토"];
+const today=new Date();
+const todayDay=today.getDay();
+const todayStr=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+function dateToLocal(d){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
+const ADMIN_UID="demo"; // TODO: Firebase 콘솔에서 확인한 본인 UID로 교체
+
+let currentUser=null;
+let userProfile={name:"나 (데모)",emoji:"🌟",uid:"demo"};
+let checkedIn=false;
+let pendingDeleteId=null, pendingEditId=null, selectedEmoji=null;
+let weekChart=null, detailChart=null;
+let detailOpen=false;
+let currentPresetDays=7;
+let myFeedCache={}; // { date: feedEntryData } — 과거 피드 반응 캐시
+let allMembers=[];
+let todayAttendanceMap={};
+let unsubscribeMembers=null;
+const BADGES=[
+  {id:"first",   emoji:"🌱", label:"첫 발걸음",  desc:"처음으로 출석하기",               check:(r,s)=>r.length>=1},
+  {id:"s3",      emoji:"🌤️", label:"사흘 연속",  desc:"3일 연속 출석",                   check:(r,s)=>s>=3},
+  {id:"t5",      emoji:"💫", label:"총 5회",     desc:"총 5회 출석",                     check:(r,s)=>r.length>=5},
+  {id:"s7",      emoji:"🔥", label:"7일 연속",   desc:"7일 연속 출석",                   check:(r,s)=>s>=7},
+  {id:"t10",     emoji:"💪", label:"총 10회",    desc:"총 10회 출석",                    check:(r,s)=>r.length>=10},
+  {id:"s14",     emoji:"📅", label:"2주 연속",   desc:"14일 연속 출석",                  check:(r,s)=>s>=14},
+  {id:"t30",     emoji:"⭐", label:"총 30회",    desc:"총 30회 출석",                    check:(r,s)=>r.length>=30},
+  {id:"weekend", emoji:"🌸", label:"주말 전사",  desc:"주말(토·일) 10회 출석",           check:(r,s)=>r.filter(x=>x.day==="토"||x.day==="일").length>=10},
+  {id:"longlog", emoji:"✍️", label:"기록왕",     desc:"50자 이상 일지 10개 작성",        check:(r,s)=>r.filter(x=>x.log&&x.log.length>=50).length>=10},
+  {id:"s30",     emoji:"🌙", label:"30일 연속",  desc:"30일 연속 출석",                  check:(r,s)=>s>=30},
+  {id:"pub20",   emoji:"🌐", label:"공개 마니아",desc:"공개 일지 20개 작성",             check:(r,s)=>r.filter(x=>x.isPublic).length>=20},
+  {id:"t50",     emoji:"🌊", label:"총 50회",    desc:"총 50회 출석",                    check:(r,s)=>r.length>=50},
+  {id:"t100",    emoji:"👑", label:"총 100회",   desc:"총 100회 출석",                   check:(r,s)=>r.length>=100},
+  {id:"s60",     emoji:"🏔️", label:"60일 연속",  desc:"60일 연속 출석",                  check:(r,s)=>s>=60},
+  {id:"t200",    emoji:"💎", label:"레전드",     desc:"총 200회 출석",                   check:(r,s)=>r.length>=200},
+];
+
+let myRecords=[];
+
+// ---- 로그인 ----
+function handleGoogleLogin(){
+  auth.signInWithPopup(provider).catch(err=>alert("로그인 실패: "+err.message));
+}
+function handleLogout(){
+  auth.signOut();
+}
+function showApp(){
+  document.getElementById("authScreen").style.display="none";
+  document.getElementById("app").style.display="block";
+  document.getElementById("headerDate").textContent=`${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일 (${DAYS[todayDay]})`;
+  if(currentUser) document.getElementById("profileEmail").textContent=currentUser.email||"";
+  updateProfileUI();
+  renderToday(); renderFeed(); renderStats(); renderProfile();
+}
+
+let unsubscribeAttendance=null, unsubscribeFeed=null;
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    currentUser={name:user.displayName,photo:user.photoURL,uid:user.uid,email:user.email};
+
+    // Firestore에서 프로필 로드 또는 최초 등록
+    const memberRef=db.collection("members").doc(user.uid);
+    try{
+      const memberDoc=await memberRef.get();
+      if(memberDoc.exists){
+        const d=memberDoc.data();
+        userProfile.name=d.name||user.displayName||"새벽회원";
+        userProfile.emoji=d.emoji||"🌟";
+      } else {
+        userProfile.name=localStorage.getItem("mc_name")||user.displayName||"새벽회원";
+        userProfile.emoji=localStorage.getItem("mc_emoji")||"🌟";
+        await memberRef.set({
+          name:userProfile.name, emoji:userProfile.emoji,
+          email:user.email||"", photo:user.photoURL||"", uid:user.uid,
+          createdAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    } catch(e){ console.error("멤버 등록 오류:",e); }
+    userProfile.uid=user.uid;
+    showApp();
+
+    // 내 출석 기록 실시간 구독
+    unsubscribeAttendance=db.collection("attendance").doc(user.uid).collection("records")
+      .orderBy("date","desc")
+      .onSnapshot(snap=>{
+        myRecords=snap.docs.map(doc=>({id:doc.id,...doc.data()}));
+        checkedIn=myRecords.some(r=>r.date===todayStr);
+        // feed 엔트리 누락 시 재동기화 (feed 쓰기 실패 fallback)
+        const todayRec=myRecords.find(r=>r.date===todayStr);
+        if(todayRec&&currentUser&&!todayAttendanceMap[currentUser.uid]){
+          db.collection("feed").doc(todayStr).collection("entries").doc(currentUser.uid)
+            .set({date:todayRec.date,day:todayRec.day,log:todayRec.log,isPublic:todayRec.isPublic,
+                  uid:todayRec.uid,userName:todayRec.userName,userEmoji:todayRec.userEmoji,
+                  timestamp:todayRec.timestamp||firebase.firestore.FieldValue.serverTimestamp()})
+            .catch(e=>console.error("피드 재동기화 오류:",e));
+        }
+        renderToday(); renderProfile(); renderDetailStats(); renderStats();
+      }, e=>console.error("출석 구독 오류:",e));
+
+    // 전체 멤버 목록 실시간 구독 → 멤버 탭
+    unsubscribeMembers=db.collection("members").onSnapshot(snap=>{
+      allMembers=snap.docs.map(doc=>doc.data());
+      renderMemberFeed();
+      renderRanking();
+    }, e=>console.error("멤버 구독 오류:",e));
+
+    // 오늘 전체 출석 구독 → 오늘 탭 피드 + 멤버 탭 출석 상태
+    unsubscribeFeed=db.collection("feed").doc(todayStr).collection("entries")
+      .onSnapshot(snap=>{
+        todayAttendanceMap={};
+        snap.docs.forEach(doc=>{ const d=doc.data(); todayAttendanceMap[d.uid]=d; });
+        const entries=snap.docs
+          .map(doc=>doc.data())
+          .sort((a,b)=>(b.timestamp?.toMillis?.()??0)-(a.timestamp?.toMillis?.()??0));
+        // 오늘 내 피드 엔트리를 캐시에 동기화 (프로필 탭 실시간 반응 표시용)
+        if(currentUser&&todayAttendanceMap[currentUser.uid])
+          myFeedCache[todayStr]=todayAttendanceMap[currentUser.uid];
+        renderTodayFeedData(entries);
+        renderMemberFeed();
+        // 프로필 탭이 열려있으면 받은 반응 실시간 갱신
+        if(document.getElementById("tab-profile")?.classList.contains("active")) renderProfile();
+      }, e=>console.error("피드 구독 오류:",e));
+
+  } else {
+    if(unsubscribeAttendance){unsubscribeAttendance();unsubscribeAttendance=null;}
+    if(unsubscribeFeed){unsubscribeFeed();unsubscribeFeed=null;}
+    if(unsubscribeMembers){unsubscribeMembers();unsubscribeMembers=null;}
+    currentUser=null; myRecords=[]; checkedIn=false;
+    allMembers=[]; todayAttendanceMap={}; myFeedCache={};
+    document.getElementById("app").style.display="none";
+    document.getElementById("authScreen").style.display="flex";
+  }
+});
+
+function switchTab(name,btn){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));
+  document.getElementById("tab-"+name).classList.add("active");
+  if(btn) btn.classList.add("active");
+  if(name==="profile") loadProfileReactions();
+}
+function updateProfileUI(){
+  const photo=currentUser&&currentUser.photo;
+  const headerEl=document.getElementById("headerEmoji");
+  const profileEl=document.getElementById("profileEmoji");
+  if(photo){
+    headerEl.innerHTML=`<img src="${photo}" class="avatar-img" referrerpolicy="no-referrer" alt="프로필">`;
+    profileEl.innerHTML=`<img src="${photo}" class="profile-avatar-img" referrerpolicy="no-referrer" alt="프로필">`;
+  } else {
+    headerEl.textContent=userProfile.emoji;
+    profileEl.textContent=userProfile.emoji;
+  }
+  document.getElementById("profileName").textContent=userProfile.name;
+  const streak=getStreak();
+  const streakEl=document.getElementById("profileStreak");
+  if(streakEl) streakEl.innerHTML=streak>0?`<span class="streak-badge">🔥 ${streak}일 연속</span>`:"";
+}
+
+// ---- TODAY ----
+let newLogPublic=true;
+function renderToday(){
+  const badges=document.getElementById("dayBadges");
+  badges.innerHTML=["월","화","수","목","금","토","일"].map((d,i)=>{
+    const idx=i<5?i+1:i===5?6:0;
+    const isToday=idx===todayDay;
+    const req=idx>=1&&idx<=5;
+    const cls=isToday?"today":req?"required":"optional";
+    return `<span class="day-badge ${cls}">${isToday?"🌅 오늘 ":""}${d}${isToday?"":" "+(req?"✅필수":"🌟선택")}</span>`;
+  }).join("");
+
+  const area=document.getElementById("attendanceArea");
+  if(checkedIn){
+    area.innerHTML=`<div class="checked-in-badge">✅ 오늘 출석 완료! 수고했어요 🎉</div>`;
+  } else {
+    area.innerHTML=`
+      <div class="attendance-form">
+        <div class="form-label">📝 오늘 뭘 하셨나요?</div>
+        <textarea id="logInput" rows="3" placeholder="예: 영어 단어 50개, 독서 30분, 코딩 공부..."></textarea>
+        <div class="privacy-row">
+          <div class="privacy-label">👀 메모 공개 여부</div>
+          <div class="toggle-wrap">
+            <span class="toggle-text" id="privacyText">${newLogPublic?"전체 공개":"나만 보기"}</span>
+            <label class="toggle">
+              <input type="checkbox" id="privacyToggle" ${newLogPublic?"checked":""} onchange="toggleNewLogPrivacy()">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="checkIn()">🌅 출석 체크하기</button>
+      </div>`;
+  }
+
+}
+// todayFeed는 renderTodayFeedData()가 단독 관리
+
+function toggleNewLogPrivacy(){
+  newLogPublic=document.getElementById("privacyToggle").checked;
+  document.getElementById("privacyText").textContent=newLogPublic?"전체 공개":"나만 보기";
+}
+
+async function checkIn(){
+  const log=document.getElementById("logInput").value.trim();
+  if(!log){alert("오늘 한 일을 간단히 적어주세요 😊");return;}
+  const btn=document.querySelector(".btn-primary");
+  if(btn) btn.disabled=true;
+  const record={
+    date:todayStr, day:DAYS[todayDay], log, isPublic:newLogPublic,
+    uid:currentUser.uid, userName:userProfile.name, userEmoji:userProfile.emoji,
+    timestamp:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  await Promise.all([
+    db.collection("attendance").doc(currentUser.uid).collection("records").doc(todayStr).set(record),
+    db.collection("feed").doc(todayStr).collection("entries").doc(currentUser.uid).set(record)
+  ]);
+}
+
+// ---- FEED ----
+function renderFeed(){
+  document.getElementById("memberFeed").innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px">멤버 목록을 불러오는 중...</div>`;
+}
+
+// 오늘 탭 피드 — 오늘 출석한 전체 멤버 표시 (본인 포함)
+function renderTodayFeedData(entries){
+  const el=document.getElementById("todayFeed");
+  if(entries.length===0){
+    el.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px">오늘 아직 활동한 멤버가 없어요 🌱</div>`;
+    return;
+  }
+  el.innerHTML=entries.map(entry=>{
+    const isMe=entry.uid===currentUser?.uid;
+    const cardId=`${entry.uid}-${entry.date}`;
+    const rBar=buildReactionBar(entry,cardId,isMe);
+    const logHtml=entry.isPublic
+      ?`<div class="member-log">💬 ${entry.log}</div>`
+      :`<div class="member-log" style="color:var(--sub)">🔒 비공개 메모</div>`;
+    return `
+    <div class="member-card">
+      <div class="member-avatar-placeholder">${entry.userEmoji||"🌟"}</div>
+      <div class="member-info">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="member-name">${entry.userName||"멤버"}${isMe?" (나)":""}</span>
+          <span class="member-badge badge-present">✅ 출석</span>
+        </div>
+        ${logHtml}
+        ${rBar?`<div class="reaction-bar">${rBar}</div>`:""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// 멤버 탭 — 전체 멤버 목록 + 오늘 출석 여부
+function renderMemberFeed(){
+  const el=document.getElementById("memberFeed");
+  if(allMembers.length===0){
+    el.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px">아직 등록된 멤버가 없어요 🌱</div>`;
+    return;
+  }
+  el.innerHTML=allMembers.map(m=>{
+    const isMe=m.uid===currentUser?.uid;
+    const rec=todayAttendanceMap[m.uid];
+    const cardId=`${m.uid}-${todayStr}`;
+    const rBar=rec?buildReactionBar(rec,cardId,isMe):"";
+    const logHtml=rec
+      ?(rec.isPublic?`<div class="member-log">💬 ${rec.log}</div>`:`<div class="member-log" style="color:var(--sub)">🔒 비공개 메모</div>`)
+      :"";
+    return `
+    <div class="member-card">
+      <div class="member-avatar-placeholder">${m.emoji||"🌟"}</div>
+      <div class="member-info">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="member-name">${m.name||"멤버"}${isMe?" (나)":""}</span>
+          <span class="member-badge ${rec?"badge-present":"badge-absent"}">${rec?"✅ 출석":"⏳ 미출석"}</span>
+        </div>
+        ${logHtml}
+        ${rBar?`<div class="reaction-bar">${rBar}</div>`:""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ---- STATS ----
+function renderStats(){
+  const streak=getStreak();
+
+  // 이번 달 출석률 계산
+  const thisMonthStr=today.toISOString().slice(0,7);
+  const thisMonthRecs=myRecords.filter(r=>r.date.startsWith(thisMonthStr));
+  const daysElapsed=today.getDate();
+  const possibleDays=Array.from({length:daysElapsed},(_,i)=>{
+    const d=new Date(today.getFullYear(),today.getMonth(),i+1);
+    return d.getDay();
+  }).filter(d=>d>=1&&d<=5).length;
+  const monthRate=possibleDays>0?Math.round(thisMonthRecs.length/possibleDays*100):0;
+
+  // 지난 달 출석률 계산
+  const lastM=new Date(today.getFullYear(),today.getMonth()-1,1);
+  const lastMonthStr=lastM.toISOString().slice(0,7);
+  const lastMonthRecs=myRecords.filter(r=>r.date.startsWith(lastMonthStr));
+  const lastMonthDays=new Date(today.getFullYear(),today.getMonth(),0).getDate();
+  const lastPossible=Array.from({length:lastMonthDays},(_,i)=>{
+    const d=new Date(lastM.getFullYear(),lastM.getMonth(),i+1);
+    return d.getDay();
+  }).filter(d=>d>=1&&d<=5).length;
+  const lastMonthRate=lastPossible>0?Math.round(lastMonthRecs.length/lastPossible*100):0;
+
+  document.getElementById("statsGrid").innerHTML=`
+    <div class="stat-card" style="grid-column:1/-1"><div class="stat-emoji">🔥</div><div class="stat-value">${streak}일</div><div class="stat-label">연속 출석 스트릭</div></div>
+    <div class="stat-card"><div class="stat-emoji">📆</div><div class="stat-value">${myRecords.length}일</div><div class="stat-label">나의 총 출석</div></div>
+    <div class="stat-card"><div class="stat-emoji">📅</div><div class="stat-value">${monthRate}%</div><div class="stat-label">이번 달 출석률</div></div>`;
+
+  // 주간 차트 — 내 실제 출석 데이터
+  const dayOrder=[1,2,3,4,5,6,0];
+  const thisWeekData=dayOrder.map(dayIdx=>{
+    const d=new Date(today);
+    d.setDate(today.getDate()-((todayDay-dayIdx+7)%7));
+    return myRecords.some(r=>r.date===d.toISOString().slice(0,10))?100:0;
+  });
+  const lastWeekData=dayOrder.map(dayIdx=>{
+    const d=new Date(today);
+    d.setDate(today.getDate()-((todayDay-dayIdx+7)%7)-7);
+    return myRecords.some(r=>r.date===d.toISOString().slice(0,10))?100:0;
+  });
+
+  if(weekChart) weekChart.destroy();
+  weekChart=new Chart(document.getElementById("weekChart").getContext("2d"),{
+    type:"line",
+    data:{labels:["월","화","수","목","금","토","일"],datasets:[
+      {label:"이번 주",data:thisWeekData,borderColor:"#FF8C69",backgroundColor:"rgba(255,140,105,.1)",borderWidth:3,pointBackgroundColor:"#FF8C69",tension:.4,fill:true},
+      {label:"지난 주",data:lastWeekData,borderColor:"#C8A8E9",backgroundColor:"rgba(200,168,233,.1)",borderWidth:2,pointBackgroundColor:"#C8A8E9",tension:.4,fill:true,borderDash:[5,5]}
+    ]},
+    options:{responsive:true,plugins:{legend:{position:"top"}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+"%"}}}}
+  });
+
+  document.getElementById("compareSection").innerHTML=`
+    <div class="compare-row">
+      <div class="compare-label">이번 달</div>
+      <div class="compare-bar-wrap"><div class="compare-bar" style="width:${monthRate}%;background:linear-gradient(90deg,#FF8C69,#FFB347)"></div></div>
+      <div class="compare-pct" style="color:#FF8C69">${monthRate}%</div>
+    </div>
+    <div class="compare-row">
+      <div class="compare-label">지난 달</div>
+      <div class="compare-bar-wrap"><div class="compare-bar" style="width:${lastMonthRate}%;background:linear-gradient(90deg,#C8A8E9,#98D8C8)"></div></div>
+      <div class="compare-pct" style="color:#C8A8E9">${lastMonthRate}%</div>
+    </div>`;
+
+  renderRanking();
+}
+
+async function renderRanking(){
+  if(!currentUser) return;
+  const el=document.getElementById("rankingSection");
+  if(!el) return;
+  if(allMembers.length===0){
+    el.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px;background:white;border-radius:20px;box-shadow:0 2px 12px rgba(0,0,0,.06)">멤버 목록을 불러오는 중... 🏆</div>`;
+    return;
+  }
+  el.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px;background:white;border-radius:20px;box-shadow:0 2px 12px rgba(0,0,0,.06)">랭킹 집계 중... 🏆</div>`;
+  try{
+    const counts=await Promise.all(allMembers.map(async m=>{
+      const snap=await db.collection("attendance").doc(m.uid).collection("records").get();
+      return {...m,count:snap.size};
+    }));
+    counts.sort((a,b)=>b.count-a.count);
+    const max=counts[0]?.count||1;
+    const rankEmojis=["🥇","🥈","🥉"];
+    el.innerHTML=counts.map((m,i)=>{
+      const rankLabel=i<3?rankEmojis[i]:`${i+1}위`;
+      const pct=max>0?Math.round(m.count/max*100):0;
+      const isMe=m.uid===currentUser?.uid;
+      return `
+        <div class="rank-card">
+          <div class="rank-num">${rankLabel}</div>
+          <div class="rank-bar-wrap">
+            <div class="rank-name">${m.emoji||"🌟"} ${m.name||"멤버"}${isMe?" (나)":""}</div>
+            <div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${pct}%"></div></div>
+          </div>
+          <div class="rank-pct">${m.count}일</div>
+        </div>`;
+    }).join("")||`<div style="color:var(--sub);text-align:center;padding:20px">아직 출석 기록이 없어요 🌱</div>`;
+  } catch(e){
+    console.error("랭킹 오류:",e);
+    el.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px;background:white;border-radius:20px;box-shadow:0 2px 12px rgba(0,0,0,.06)">랭킹을 불러오지 못했어요 😢</div>`;
+  }
+}
+
+// ---- 상세 통계 ----
+function toggleDetail(){
+  detailOpen=!detailOpen;
+  document.getElementById("detailPanel").style.display=detailOpen?"block":"none";
+  document.getElementById("detailBtnText").textContent=detailOpen?"상세 통계 닫기":"내 상세 통계 보기";
+  if(detailOpen) renderDetailStats();
+}
+
+function setPreset(days, btn){
+  currentPresetDays=days;
+  document.querySelectorAll(".btn-range").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("customDateRow").style.display=days===0?"flex":"none";
+  if(days!==0) renderDetailStats();
+}
+
+function applyCustomRange(){
+  currentPresetDays=0;
+  renderDetailStats();
+}
+
+function getFilteredRecords(){
+  if(currentPresetDays===0){
+    const from=document.getElementById("dateFrom").value;
+    const to=document.getElementById("dateTo").value;
+    if(!from||!to) return myRecords;
+    return myRecords.filter(r=>r.date>=from&&r.date<=to);
+  }
+  const cutoff=new Date(today);
+  cutoff.setDate(today.getDate()-currentPresetDays+1);
+  const cutoffStr=cutoff.toISOString().slice(0,10);
+  return myRecords.filter(r=>r.date>=cutoffStr);
+}
+
+function renderDetailStats(){
+  if(!detailOpen) return;
+  const records=getFilteredRecords();
+  const total=records.length;
+  const pubCount=records.filter(r=>r.isPublic).length;
+  const privCount=total-pubCount;
+
+  // 기간 내 가능한 평일 수 계산
+  let possibleDays=currentPresetDays===0?total:
+    Array.from({length:currentPresetDays},(_,i)=>{
+      const d=new Date(today); d.setDate(today.getDate()-i);
+      return d.getDay();
+    }).filter(d=>d>=1&&d<=5).length;
+
+  const rate=possibleDays>0?Math.round(total/possibleDays*100):0;
+
+  document.getElementById("detailSummary").innerHTML=`
+    <div class="detail-sum-card"><div class="detail-sum-val">${total}일</div><div class="detail-sum-label">총 출석</div></div>
+    <div class="detail-sum-card"><div class="detail-sum-val">${rate}%</div><div class="detail-sum-label">출석률</div></div>
+    <div class="detail-sum-card"><div class="detail-sum-val">${privCount}개</div><div class="detail-sum-label">비공개 메모</div></div>`;
+
+  // 기록 목록
+  if(records.length===0){
+    document.getElementById("detailLogList").innerHTML=`<div style="color:var(--sub);padding:16px;text-align:center">이 기간에 출석 기록이 없어요 🌱</div>`;
+  } else {
+    document.getElementById("detailLogList").innerHTML=records.map(r=>`
+      <div class="detail-log-row">
+        <div class="detail-log-date">${r.date}<br><span style="font-size:11px">(${r.day})</span></div>
+        <div class="detail-log-text">💬 ${r.log}
+          <span class="${r.isPublic?"":"detail-log-priv"}">${r.isPublic?"🌐 공개":"🔒 비공개"}</span>
+        </div>
+      </div>`).join("");
+  }
+
+  // 미니 차트 (날짜별 출석 시각화)
+  const last14=Array.from({length:14},(_,i)=>{
+    const d=new Date(today); d.setDate(today.getDate()-13+i);
+    const ds=d.toISOString().slice(0,10);
+    return {label:`${d.getMonth()+1}/${d.getDate()}`,val:records.some(r=>r.date===ds)?1:0};
+  });
+  if(detailChart) detailChart.destroy();
+  detailChart=new Chart(document.getElementById("detailChart").getContext("2d"),{
+    type:"bar",
+    data:{
+      labels:last14.map(d=>d.label),
+      datasets:[{
+        label:"출석",data:last14.map(d=>d.val),
+        backgroundColor:last14.map(d=>d.val?"rgba(255,140,105,.8)":"rgba(240,232,224,.5)"),
+        borderRadius:6,borderSkipped:false
+      }]
+    },
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>v.raw===1?"✅ 출석":"결석"}}},
+      scales:{y:{display:false,max:1.5},x:{ticks:{font:{size:11}}}}}
+  });
+}
+
+// ---- PROFILE ----
+function renderProfile(){
+  updateProfileUI();
+  renderBadges();
+  const rec=document.getElementById("myRecords");
+  if(myRecords.length===0){
+    rec.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px">아직 출석 기록이 없어요 🌱</div>`;
+  } else {
+    rec.innerHTML=myRecords.map(r=>{
+      const feedEntry=r.date===todayStr?(todayAttendanceMap[currentUser?.uid]||{}):(myFeedCache[r.date]||{});
+      const receivedBar=buildReceivedBar(feedEntry);
+      return `
+      <div class="member-card">
+        <div class="member-avatar-placeholder" style="width:44px;height:44px;font-size:18px">📅</div>
+        <div class="member-info">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="member-name">${r.date} (${r.day})</span>
+            <span class="member-badge badge-present">✅ 출석</span>
+          </div>
+          <div class="member-log">💬 ${r.log}
+            <div class="card-actions">
+              <button class="btn-sm btn-edit" onclick="openEditLog('${r.id}','${r.log.replace(/'/g,"\\'")}')">✏️ 수정</button>
+              <button class="btn-sm btn-delete" onclick="openDelete('${r.id}')">🗑️ 삭제</button>
+              <button class="btn-sm btn-privacy" onclick="togglePrivacy('${r.id}')">${r.isPublic?"🔒 비공개로":"🌐 공개로"}</button>
+              <span style="font-size:11px;color:${r.isPublic?"#2E7D32":"#7B1FA2"};font-weight:600">${r.isPublic?"공개 중":"비공개 중"}</span>
+            </div>
+          </div>
+          ${receivedBar?`<div style="margin-top:6px;padding:6px 0 2px"><span style="font-size:12px;color:var(--sub);font-weight:600">받은 반응</span><div class="reaction-bar" style="margin-top:4px">${receivedBar}</div></div>`:""}
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  const adminSec=document.getElementById("adminSection");
+  if(currentUser&&currentUser.uid===ADMIN_UID){
+    adminSec.style.display="block";
+    db.collection("members").get().then(snap=>{
+      document.getElementById("adminMemberList").innerHTML=snap.docs.map(doc=>{
+        const m=doc.data();
+        return `<div class="admin-member-row">
+          <div style="font-size:22px">${m.emoji||"🌟"}</div>
+          <div style="flex:1;font-weight:600">${m.name}</div>
+          <div style="font-size:13px;color:var(--sub);margin-right:8px">${m.email||""}</div>
+          <button class="btn-kick" onclick="kickMember('${doc.id}','${m.name}')">내보내기</button>
+        </div>`;
+      }).join("")||`<div style="color:var(--sub);font-size:13px;padding:10px 0">멤버가 없습니다.</div>`;
+    });
+  }
+}
+
+// ---- 공개/비공개 토글 (기존 기록) ----
+function togglePrivacy(id){
+  const r=myRecords.find(r=>r.id===id);
+  if(!r) return;
+  const newVal=!r.isPublic;
+  db.collection("attendance").doc(currentUser.uid).collection("records").doc(id).update({isPublic:newVal});
+  if(id===todayStr)
+    db.collection("feed").doc(todayStr).collection("entries").doc(currentUser.uid).update({isPublic:newVal}).catch(()=>{});
+}
+
+// ---- 닉네임 ----
+function openEditProfile(){ document.getElementById("nameInput").value=userProfile.name; openModal("modalName"); }
+function saveName(){
+  const v=document.getElementById("nameInput").value.trim();
+  if(!v){alert("닉네임을 입력해주세요");return;}
+  userProfile.name=v; localStorage.setItem("mc_name",v);
+  db.collection("members").doc(currentUser.uid).update({name:v});
+  updateProfileUI(); closeModal("modalName");
+}
+
+// ---- 이모지 ----
+function openEditEmoji(){
+  selectedEmoji=userProfile.emoji;
+  document.getElementById("emojiPicker").innerHTML=EMOJIS.map(e=>
+    `<span class="emoji-opt${e===selectedEmoji?" selected":""}" onclick="selectEmoji('${e}')">${e}</span>`
+  ).join("");
+  openModal("modalEmoji");
+}
+function selectEmoji(e){
+  selectedEmoji=e;
+  document.querySelectorAll(".emoji-opt").forEach(el=>el.classList.toggle("selected",el.textContent===e));
+}
+function saveEmoji(){ if(selectedEmoji){ userProfile.emoji=selectedEmoji; localStorage.setItem("mc_emoji",selectedEmoji); db.collection("members").doc(currentUser.uid).update({emoji:selectedEmoji}); } updateProfileUI(); closeModal("modalEmoji"); }
+
+// ---- 일지 수정 ----
+function openEditLog(id,log){ pendingEditId=id; document.getElementById("editLogInput").value=log; openModal("modalEditLog"); }
+function saveEditLog(){
+  const v=document.getElementById("editLogInput").value.trim();
+  if(!v){alert("내용을 입력해주세요");return;}
+  db.collection("attendance").doc(currentUser.uid).collection("records").doc(pendingEditId).update({log:v});
+  if(pendingEditId===todayStr)
+    db.collection("feed").doc(todayStr).collection("entries").doc(currentUser.uid).update({log:v}).catch(()=>{});
+  closeModal("modalEditLog");
+}
+
+// ---- 삭제 ----
+function openDelete(id){ pendingDeleteId=id; openModal("modalDelete"); }
+function confirmDelete(){
+  db.collection("attendance").doc(currentUser.uid).collection("records").doc(pendingDeleteId).delete();
+  if(pendingDeleteId===todayStr)
+    db.collection("feed").doc(todayStr).collection("entries").doc(currentUser.uid).delete().catch(()=>{});
+  closeModal("modalDelete");
+}
+
+// ---- 관리자 ----
+function kickMember(id,name){ if(confirm(`${name} 멤버를 내보낼까요?`)) alert(`${name} 멤버를 내보냈어요.`); }
+function generateInvite(){
+  const link=`https://your-app-url.web.app/invite?code=DEMO_${Date.now()}`;
+  document.getElementById("inviteLink").textContent=link;
+  navigator.clipboard.writeText(link).then(()=>alert("링크가 복사되었어요! 📋")).catch(()=>{});
+}
+
+// ---- 스트릭 ----
+function getStreak(){
+  const dateSet=new Set(myRecords.map(r=>r.date));
+  const check=new Date(today);
+  if(!dateSet.has(todayStr)) check.setDate(check.getDate()-1);
+  let streak=0;
+  while(true){
+    const ds=dateToLocal(check);
+    if(dateSet.has(ds)){streak++;check.setDate(check.getDate()-1);}
+    else break;
+  }
+  return streak;
+}
+
+// ---- 뱃지 ----
+function getEarnedBadges(){
+  const streak=getStreak();
+  return BADGES.filter(b=>b.check(myRecords,streak));
+}
+function renderBadges(){
+  const shelf=document.getElementById("badgeShelf");
+  if(!shelf) return;
+  const earned=getEarnedBadges();
+  shelf.innerHTML=earned.length===0
+    ?`<span style="font-size:13px;color:var(--sub)">뱃지를 모아보세요 🌱</span>`
+    :earned.map(b=>`<span class="badge-pill">${b.emoji} ${b.label}</span>`).join("");
+}
+function openBadgeList(){
+  const streak=getStreak();
+  const earnedIds=new Set(getEarnedBadges().map(b=>b.id));
+  const html=BADGES.map(b=>{
+    const earned=earnedIds.has(b.id);
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #F5F0EA;${earned?'':'opacity:.4'}">
+      <span style="font-size:28px;min-width:36px;text-align:center">${b.emoji}</span>
+      <div style="flex:1">
+        <div style="font-weight:700">${b.label} ${earned?'<span style="color:#2E7D32;font-size:12px">✅ 획득</span>':'<span style="font-size:12px;color:var(--sub)">🔒 미획득</span>'}</div>
+        <div style="font-size:12px;color:var(--sub);margin-top:2px">${b.desc}</div>
+      </div>
+    </div>`;
+  }).join("");
+  document.getElementById("badgeListContent").innerHTML=html;
+  openModal("modalBadges");
+}
+
+// ---- 반응 헬퍼 ----
+const REACTION_KEYS=["r0","r1","r2","r3"];
+const REACTION_EMOJIS_ARR=["👍","❤️","💪","🎉"];
+
+// entryData: feed 문서 데이터 (r0~r3 배열 포함), isMe: 내 게시글 여부
+function buildReactionBar(entryData,cardId,isMe){
+  const bars=REACTION_EMOJIS_ARR.map((emoji,i)=>{
+    const voters=(entryData&&entryData[REACTION_KEYS[i]])||[];
+    const count=voters.length;
+    const isMine=!!(currentUser&&voters.includes(currentUser.uid));
+    if(isMe) return count>0?`<span class="btn-reaction" style="cursor:default">${emoji} ${count}</span>`:"";
+    return `<button class="btn-reaction ${isMine?"active":""}" onclick="toggleReaction('${cardId}','${emoji}')">${emoji}${count>0?" "+count:""}</button>`;
+  }).join("");
+  return bars.replace(/^(\s*)+$/,"");
+}
+
+// 프로필 탭 전용 — 반응 수 옆에 반응한 멤버 이모지 요약 표시
+// 예: 👍 2 · 🌟 🦁   ❤️ 1 · 🐸
+function buildReceivedBar(feedEntry){
+  if(!feedEntry) return "";
+  const bars=REACTION_EMOJIS_ARR.map((emoji,i)=>{
+    const voters=(feedEntry[REACTION_KEYS[i]])||[];
+    if(voters.length===0) return "";
+    const voterEmojis=voters.map(uid=>{
+      const m=allMembers.find(m=>m.uid===uid);
+      return m?m.emoji:"🌟";
+    }).join("\u2009"); // thin space로 이모지 간격
+    return `<span class="btn-reaction" style="cursor:default">${emoji} ${voters.length} · ${voterEmojis}</span>`;
+  }).join("");
+  return bars;
+}
+
+// 과거 출석 기록의 feed 엔트리(반응 포함)를 캐시로 로드 후 프로필 재렌더
+async function loadProfileReactions(){
+  if(!currentUser||myRecords.length===0) return;
+  const toFetch=myRecords.filter(r=>r.date!==todayStr&&myFeedCache[r.date]===undefined).map(r=>r.date);
+  if(toFetch.length===0){renderProfile();return;}
+  try{
+    await Promise.all(toFetch.map(async date=>{
+      const doc=await db.collection("feed").doc(date).collection("entries").doc(currentUser.uid).get();
+      myFeedCache[date]=doc.exists?doc.data():{};
+    }));
+  } catch(e){console.error("프로필 반응 로드 오류:",e);}
+  renderProfile();
+}
+
+// ---- 반응 ----
+function toggleReaction(cardId,emoji){
+  if(!currentUser) return;
+  const emojiIdx=REACTION_EMOJIS_ARR.indexOf(emoji);
+  if(emojiIdx<0) return;
+  const newKey=REACTION_KEYS[emojiIdx];
+  // cardId = "authorUid-YYYY-MM-DD" (Firebase UID는 영숫자만 → 첫 번째 하이픈이 구분자)
+  const firstHyphen=cardId.indexOf("-");
+  const authorUid=cardId.slice(0,firstHyphen);
+  const date=cardId.slice(firstHyphen+1);
+  const entryData=todayAttendanceMap[authorUid]||myFeedCache[date]||{};
+  const prevKeyIdx=REACTION_KEYS.findIndex(k=>(entryData[k]||[]).includes(currentUser.uid));
+  const update={};
+  if(prevKeyIdx>=0&&REACTION_KEYS[prevKeyIdx]===newKey){
+    update[newKey]=firebase.firestore.FieldValue.arrayRemove(currentUser.uid);
+  } else {
+    if(prevKeyIdx>=0) update[REACTION_KEYS[prevKeyIdx]]=firebase.firestore.FieldValue.arrayRemove(currentUser.uid);
+    update[newKey]=firebase.firestore.FieldValue.arrayUnion(currentUser.uid);
+  }
+  db.collection("feed").doc(date).collection("entries").doc(authorUid)
+    .update(update).catch(e=>console.error("반응 저장 오류:",e));
+  // 반응은 feed onSnapshot이 재실행되어 자동 갱신됨
+}
+
+// ---- 다크 모드 ----
+function toggleDark(){
+  const isDark=document.body.classList.toggle("dark");
+  document.getElementById("darkToggleBtn").textContent=isDark?"☀️":"🌙";
+  localStorage.setItem("darkMode",isDark);
+}
+
+// ---- 모달 ----
+function openModal(id){ document.getElementById(id).classList.add("open"); }
+function closeModal(id){ document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll(".modal-bg").forEach(bg=>{
+  bg.addEventListener("click",e=>{ if(e.target===bg) bg.classList.remove("open"); });
+});
+if(localStorage.getItem("darkMode")==="true") toggleDark();
+</script>
+</body>
+</html>
