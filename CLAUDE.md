@@ -65,6 +65,8 @@ match /feed/{date}/entries/{uid}   {
 | `allMembers` | 전체 멤버 배열 — members onSnapshot 실시간 동기화 |
 | `todayAttendanceMap` | `{ uid: feedEntry }` — feed onSnapshot 실시간 동기화. r0~r3 반응 데이터 포함 |
 | `myFeedCache` | `{ date: feedEntry }` — 과거 날짜 feed 엔트리 캐시 (프로필 탭 반응 표시용) |
+| `allFeedEntryCache` | `{ "uid-date": feedEntry }` — 전체 피드 탭 로드 시 채워지는 캐시. `toggleReaction` 에서 참조 |
+| `currentFeedTab` | `'today'` 또는 `'all'` — 오늘 탭 내 피드 서브탭 상태 |
 | `checkedIn` | 오늘 출석 여부 (myRecords에서 todayStr 존재 여부로 결정) |
 | `todayStr` | **로컬 시간** 기준 YYYY-MM-DD. `dateToLocal(today)` 헬퍼로 생성 |
 | `ADMIN_UID` | 모임장 UID — **"demo"에서 실제 Firebase UID로 교체 필요** |
@@ -88,7 +90,7 @@ unsubscribeFeed        →  feed/{todayStr}/entries  (오늘 피드, 반응 포�
                            → 프로필 탭 활성 상태면 renderProfile 호출
 ```
 
-로그아웃 시 세 구독 모두 해제 및 `myFeedCache={}` 초기화.
+로그아웃 시 세 구독 모두 해제 및 `myFeedCache`, `allFeedEntryCache` 초기화, `switchFeedTab('today')` 호출.
 
 ## 렌더링 함수 역할 분리
 
@@ -96,6 +98,8 @@ unsubscribeFeed        →  feed/{todayStr}/entries  (오늘 피드, 반응 포�
 |---|---|---|
 | `renderToday()` | 오늘 탭 출석 폼/완료 뱃지, 요일 뱃지. **`#todayFeed`는 건드리지 않음** | `checkedIn`, `myRecords` |
 | `renderTodayFeedData(entries)` | `#todayFeed` 단독 관리 | feed onSnapshot entries |
+| `switchFeedTab(tab)` | `#todayFeed` / `#allFeed` 표시·숨김 전환 | `currentFeedTab` |
+| `renderAllFeed()` | `#allFeed` 단독 관리 — 최근 14일 feed를 날짜별로 표시 | Firestore (fetch, 실시간 구독 없음) |
 | `renderMemberFeed()` | `#memberFeed` 단독 관리 | `allMembers` + `todayAttendanceMap` |
 | `renderStats()` | 통계 탭 (스트릭, 출석률, 차트) + `renderRanking()` 호출 | `myRecords` |
 | `renderRanking()` | `#rankingSection` — 비동기, 멤버별 attendance 레코드 수 쿼리 | Firestore |
@@ -113,7 +117,7 @@ const REACTION_EMOJIS_ARR = ["👍","❤️","💪","🎉"];
 
 - **`buildReactionBar(entryData, cardId, isMe)`** — 피드/멤버 탭용. isMe=true면 읽기 전용 span, false면 클릭 가능 button
 - **`buildReceivedBar(feedEntry)`** — 프로필 탭 전용. 반응 수 + 반응한 멤버 이모지 표시 (`👍 2 · 🌟 🦁`)
-- **`toggleReaction(cardId, emoji)`** — `arrayUnion`/`arrayRemove`로 Firestore 업데이트. feed onSnapshot이 자동 재실행되어 UI 갱신
+- **`toggleReaction(cardId, emoji)`** — `arrayUnion`/`arrayRemove`로 Firestore 업데이트. 현재 반응 상태는 `todayAttendanceMap[authorUid]` → `allFeedEntryCache[cardId]` → `myFeedCache[date]` 순으로 조회. 오늘 피드는 onSnapshot이 자동 갱신, **전체 피드 탭에서는 400ms 후 `renderAllFeed()` 재호출**
 
 ## 디자인 시스템
 
@@ -136,7 +140,8 @@ CSS 변수 (`index.html` `<style>` 상단):
 ## 주의사항
 
 - **날짜 계산**: `today.toISOString()`은 UTC 기준 → KST 새벽에 전날 날짜가 됨. 반드시 `dateToLocal(d)` 헬퍼 사용
-- **`#todayFeed`**: `renderTodayFeedData()`만 수정 — `renderToday()`에서 건드리면 타이밍 충돌로 피드가 빈 상태로 덮어써짐
+- **`#todayFeed` / `#allFeed`**: `renderTodayFeedData()`와 `renderAllFeed()`가 각각 단독 관리. `renderToday()`에서 건드리면 타이밍 충돌로 피드가 빈 상태로 덮어써짐
+- **전체 피드 탭**: `renderAllFeed()`는 실시간 구독이 없으므로 반응 토글 후 자동 재fetch됨. 날짜 파싱 시 `new Date(date+'T00:00:00')` 형태로 로컬 시간 기준 처리
 - **`attendance` 수정 시**: 날짜가 `todayStr`이면 `feed`도 반드시 동기화 (수정·삭제·공개토글 모두)
 - **차트 재렌더링**: `weekChart`, `detailChart`는 재렌더링 전 반드시 `.destroy()` 호출
 - **`ADMIN_UID`**: 실제 Firebase UID로 교체 전까지 관리자 기능 비활성화

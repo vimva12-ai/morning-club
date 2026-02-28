@@ -216,6 +216,18 @@
   .btn-reaction.active{background:#FFF3E0;border-color:var(--sunrise);}
   body.dark .btn-reaction{background:#252540;color:#E8D5C4;}
   body.dark .btn-reaction.active{background:#2A1A0A;border-color:var(--peach);}
+
+  /* ALL FEED SUB-TABS */
+  .feed-sub-tabs{display:flex;gap:6px;}
+  .feed-sub-tab{padding:6px 16px;border:2px solid #F0E8E0;border-radius:50px;background:white;color:var(--sub);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;}
+  .feed-sub-tab.active{background:linear-gradient(135deg,var(--sunrise),var(--peach));color:white;border-color:transparent;}
+  .feed-sub-tab:hover:not(.active){border-color:var(--peach);}
+  body.dark .feed-sub-tab{background:#252540;border-color:#333355;color:#A08070;}
+  body.dark .feed-sub-tab.active{background:linear-gradient(135deg,var(--sunrise),var(--peach));border-color:transparent;color:white;}
+  .allfeed-date-header{font-size:13px;font-weight:800;padding:5px 14px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;margin-bottom:10px;}
+  .allfeed-date-header.today{background:linear-gradient(135deg,var(--sunrise),var(--peach));color:white;}
+  .allfeed-date-header.past{background:#F5F0EA;color:var(--sub);}
+  body.dark .allfeed-date-header.past{background:#252540;color:#A08070;}
 </style>
 </head>
 <body>
@@ -260,8 +272,15 @@
         <div class="day-badges" id="dayBadges"></div>
         <div id="attendanceArea"></div>
       </div>
-      <div class="section-title">📝 오늘의 피드</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="section-title" style="margin-bottom:0">📝 피드</div>
+        <div class="feed-sub-tabs">
+          <button class="feed-sub-tab active" id="feedTabToday" onclick="switchFeedTab('today')">오늘</button>
+          <button class="feed-sub-tab" id="feedTabAll" onclick="switchFeedTab('all')">전체 보기</button>
+        </div>
+      </div>
       <div id="todayFeed"></div>
+      <div id="allFeed" style="display:none"></div>
     </div>
 
     <!-- FEED -->
@@ -436,6 +455,8 @@ let weekChart=null, detailChart=null;
 let detailOpen=false;
 let currentPresetDays=7;
 let myFeedCache={}; // { date: feedEntryData } — 과거 피드 반응 캐시
+let allFeedEntryCache={}; // { "uid-date": feedEntryData } — 전체 피드 뷰용 캐시
+let currentFeedTab='today';
 let allMembers=[];
 let todayAttendanceMap={};
 let unsubscribeMembers=null;
@@ -548,7 +569,8 @@ auth.onAuthStateChanged(async user=>{
     if(unsubscribeFeed){unsubscribeFeed();unsubscribeFeed=null;}
     if(unsubscribeMembers){unsubscribeMembers();unsubscribeMembers=null;}
     currentUser=null; myRecords=[]; checkedIn=false;
-    allMembers=[]; todayAttendanceMap={}; myFeedCache={};
+    allMembers=[]; todayAttendanceMap={}; myFeedCache={}; allFeedEntryCache={};
+    switchFeedTab('today');
     document.getElementById("app").style.display="none";
     document.getElementById("authScreen").style.display="flex";
   }
@@ -698,6 +720,74 @@ function renderMemberFeed(){
       </div>
     </div>`;
   }).join("");
+}
+
+// ---- ALL FEED SUB-TAB ----
+function switchFeedTab(tab){
+  currentFeedTab=tab;
+  document.getElementById('feedTabToday').classList.toggle('active',tab==='today');
+  document.getElementById('feedTabAll').classList.toggle('active',tab==='all');
+  document.getElementById('todayFeed').style.display=tab==='today'?'':'none';
+  document.getElementById('allFeed').style.display=tab==='all'?'':'none';
+  if(tab==='all') renderAllFeed();
+}
+
+async function renderAllFeed(){
+  const el=document.getElementById('allFeed');
+  if(!el) return;
+  el.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px">피드를 불러오는 중... ⏳</div>`;
+  const dates=Array.from({length:14},(_,i)=>{
+    const d=new Date(today);
+    d.setDate(today.getDate()-i);
+    return dateToLocal(d);
+  });
+  try{
+    const dayResults=await Promise.all(dates.map(async date=>{
+      const snap=await db.collection('feed').doc(date).collection('entries')
+        .orderBy('timestamp','desc').get();
+      const entries=snap.docs.map(doc=>doc.data());
+      entries.forEach(e=>{ allFeedEntryCache[`${e.uid}-${e.date}`]=e; });
+      return {date,entries};
+    }));
+    const nonEmpty=dayResults.filter(d=>d.entries.length>0);
+    if(nonEmpty.length===0){
+      el.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px">피드 기록이 없어요 🌱</div>`;
+      return;
+    }
+    el.innerHTML=nonEmpty.map(({date,entries})=>{
+      const d=new Date(date+'T00:00:00');
+      const isToday=date===todayStr;
+      const dateLabel=`${d.getMonth()+1}월 ${d.getDate()}일 (${DAYS[d.getDay()]})`;
+      const entriesHtml=entries.map(entry=>{
+        const isMe=entry.uid===currentUser?.uid;
+        const cardId=`${entry.uid}-${entry.date}`;
+        const rBar=buildReactionBar(entry,cardId,isMe);
+        const logHtml=entry.isPublic
+          ?`<div class="member-log">💬 ${entry.log}</div>`
+          :`<div class="member-log" style="color:var(--sub)">🔒 비공개 메모</div>`;
+        return `
+          <div class="member-card">
+            <div class="member-avatar-placeholder">${entry.userEmoji||'🌟'}</div>
+            <div class="member-info">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span class="member-name">${entry.userName||'멤버'}${isMe?' (나)':''}</span>
+                <span class="member-badge badge-present">✅ 출석</span>
+              </div>
+              ${logHtml}
+              ${rBar?`<div class="reaction-bar">${rBar}</div>`:''}
+            </div>
+          </div>`;
+      }).join('');
+      return `
+        <div style="margin-bottom:20px">
+          <div class="allfeed-date-header ${isToday?'today':'past'}">${isToday?'🌅':'📅'} ${dateLabel}${isToday?' · 오늘':''}</div>
+          ${entriesHtml}
+        </div>`;
+    }).join('');
+  }catch(e){
+    console.error('전체 피드 로드 오류:',e);
+    el.innerHTML=`<div style="color:var(--sub);text-align:center;padding:20px">피드를 불러오지 못했어요 😢</div>`;
+  }
 }
 
 // ---- STATS ----
@@ -1107,7 +1197,7 @@ function toggleReaction(cardId,emoji){
   const firstHyphen=cardId.indexOf("-");
   const authorUid=cardId.slice(0,firstHyphen);
   const date=cardId.slice(firstHyphen+1);
-  const entryData=todayAttendanceMap[authorUid]||myFeedCache[date]||{};
+  const entryData=todayAttendanceMap[authorUid]||allFeedEntryCache[cardId]||myFeedCache[date]||{};
   const prevKeyIdx=REACTION_KEYS.findIndex(k=>(entryData[k]||[]).includes(currentUser.uid));
   const update={};
   if(prevKeyIdx>=0&&REACTION_KEYS[prevKeyIdx]===newKey){
@@ -1118,7 +1208,8 @@ function toggleReaction(cardId,emoji){
   }
   db.collection("feed").doc(date).collection("entries").doc(authorUid)
     .update(update).catch(e=>console.error("반응 저장 오류:",e));
-  // 반응은 feed onSnapshot이 재실행되어 자동 갱신됨
+  // 전체 피드 탭은 실시간 구독이 없으므로 토글 후 재조회
+  if(currentFeedTab==='all') setTimeout(renderAllFeed,400);
 }
 
 // ---- 다크 모드 ----
