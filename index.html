@@ -413,6 +413,18 @@
   </div>
 </div>
 
+<!-- 멤버 강제 삭제 확인 모달 -->
+<div class="modal-bg" id="modalKickMember">
+  <div class="modal">
+    <div class="modal-title">👑 멤버 삭제</div>
+    <p id="kickMemberMsg" style="color:var(--sub);line-height:1.6;margin-bottom:20px"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modalKickMember')">취소</button>
+      <button class="btn-confirm" style="background:linear-gradient(135deg,#EF5350,#E53935)" onclick="confirmKickMember()">삭제</button>
+    </div>
+  </div>
+</div>
+
 <!-- 뱃지 목록 모달 -->
 <div class="modal-bg" id="modalBadges">
   <div class="modal" style="max-width:460px">
@@ -451,6 +463,7 @@ let currentUser=null;
 let userProfile={name:"나 (데모)",emoji:"🌟",uid:"demo"};
 let checkedIn=false;
 let pendingDeleteId=null, pendingEditId=null, selectedEmoji=null;
+let pendingKickId=null, pendingKickName=null;
 let weekChart=null, detailChart=null;
 let detailOpen=false;
 let currentPresetDays=7;
@@ -1019,7 +1032,7 @@ function renderProfile(){
   }
 
   const adminSec=document.getElementById("adminSection");
-  if(currentUser&&currentUser.uid===ADMIN_UID){
+  if(currentUser&&currentUser.email==="vimva12@gmail.com"){
     adminSec.style.display="block";
     db.collection("members").get().then(snap=>{
       document.getElementById("adminMemberList").innerHTML=snap.docs.map(doc=>{
@@ -1090,7 +1103,20 @@ function confirmDelete(){
 }
 
 // ---- 관리자 ----
-function kickMember(id,name){ if(confirm(`${name} 멤버를 내보낼까요?`)) alert(`${name} 멤버를 내보냈어요.`); }
+function kickMember(id,name){
+  pendingKickId=id; pendingKickName=name;
+  document.getElementById("kickMemberMsg").innerHTML=
+    `<strong>${name}</strong> 멤버를 정말 삭제하실건가요?<br>삭제 후에는 되돌릴 수 없어요.`;
+  openModal("modalKickMember");
+}
+async function confirmKickMember(){
+  if(!pendingKickId) return;
+  try{
+    await db.collection("members").doc(pendingKickId).delete();
+    closeModal("modalKickMember");
+    pendingKickId=null; pendingKickName=null;
+  } catch(e){ alert("삭제에 실패했어요: "+e.message); }
+}
 function generateInvite(){
   const link=`https://your-app-url.web.app/invite?code=DEMO_${Date.now()}`;
   document.getElementById("inviteLink").textContent=link;
