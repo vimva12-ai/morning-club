@@ -46,12 +46,21 @@ feed/{date}/entries/{uid}             ← 오늘 피드 + 반응 저장
 ## Firestore Security Rules (`firestore.rules`)
 
 ```js
-match /members/{uid}               { allow read: if auth != null; allow write: if auth.uid == uid; }
-match /attendance/{uid}/records/{date} { allow read: if auth != null; allow write: if auth.uid == uid; }
-match /feed/{date}/entries/{uid}   {
+match /members/{uid} {
   allow read: if auth != null;
-  allow create, delete: if auth.uid == uid;   // 본인 엔트리만 생성·삭제
-  allow update: if auth != null;              // 모든 멤버가 반응(r0~r3) 업데이트 가능
+  allow write: if auth.uid == uid
+               || request.auth.token.email == "vimva12@gmail.com"; // 관리자 삭제 가능
+}
+match /attendance/{uid}/records/{date} {
+  allow read: if auth != null;
+  allow write: if auth.uid == uid
+               || request.auth.token.email == "vimva12@gmail.com"; // 관리자 삭제 가능
+}
+match /feed/{date}/entries/{uid} {
+  allow read: if auth != null;
+  allow create, delete: if auth.uid == uid
+                        || request.auth.token.email == "vimva12@gmail.com"; // 관리자 삭제 가능
+  allow update: if auth != null;  // 모든 멤버가 반응(r0~r3) 업데이트 가능
 }
 ```
 
@@ -69,7 +78,8 @@ match /feed/{date}/entries/{uid}   {
 | `currentFeedTab` | `'today'` 또는 `'all'` — 오늘 탭 내 피드 서브탭 상태 |
 | `checkedIn` | 오늘 출석 여부 (myRecords에서 todayStr 존재 여부로 결정) |
 | `todayStr` | **로컬 시간** 기준 YYYY-MM-DD. `dateToLocal(today)` 헬퍼로 생성 |
-| `ADMIN_UID` | 모임장 UID — **"demo"에서 실제 Firebase UID로 교체 필요** |
+| `pendingKickId` | 관리자 멤버 삭제 시 임시 저장되는 대상 uid |
+| `pendingKickName` | 관리자 멤버 삭제 시 임시 저장되는 대상 이름 |
 
 > `todayStr`은 반드시 로컬 시간 기준이어야 함. `toISOString()`은 UTC 기준이므로 사용 금지.
 > 날짜 문자열이 필요할 때는 항상 `dateToLocal(dateObj)` 헬퍼 사용.
@@ -83,6 +93,7 @@ unsubscribeAttendance  →  attendance/{uid}/records  (내 기록, 날짜 내림
 
 unsubscribeMembers     →  members  (전체 멤버 목록)
                            → allMembers 갱신 → renderMemberFeed + renderRanking
+                           → 프로필 탭 활성 상태면 renderProfile 호출 (관리자 멤버 목록 갱신)
 
 unsubscribeFeed        →  feed/{todayStr}/entries  (오늘 피드, 반응 포함)
                            → todayAttendanceMap 갱신 → renderTodayFeedData + renderMemberFeed
@@ -137,6 +148,23 @@ CSS 변수 (`index.html` `<style>` 상단):
 - 다크 모드: `body.dark` 클래스로 전환. 모든 신규 스타일에 다크 오버라이드 추가 필요
 - UI 언어: 한국어 유지
 
+## 관리자 기능
+
+관리자 판별은 **이메일**로 처리한다. UID 변수 불필요.
+
+```js
+// JS 내 관리자 체크
+if(currentUser.email === "vimva12@gmail.com") { ... }
+```
+
+**멤버 강제 삭제 (`kickMember` → `confirmKickMember`)**
+- `kickMember(uid, name)`: `#modalKickMember` 확인 모달 오픈
+- `confirmKickMember()`: Firestore batch로 아래 세 가지를 원자적으로 삭제
+  1. `attendance/{uid}/records/*` 전체
+  2. 각 출석 날짜의 `feed/{date}/entries/{uid}`
+  3. `members/{uid}`
+- 삭제 후 `currentFeedTab==='all'`이면 `renderAllFeed()` 즉시 재호출
+
 ## 주의사항
 
 - **날짜 계산**: `today.toISOString()`은 UTC 기준 → KST 새벽에 전날 날짜가 됨. 반드시 `dateToLocal(d)` 헬퍼 사용
@@ -144,5 +172,4 @@ CSS 변수 (`index.html` `<style>` 상단):
 - **전체 피드 탭**: `renderAllFeed()`는 실시간 구독이 없으므로 반응 토글 후 자동 재fetch됨. 날짜 파싱 시 `new Date(date+'T00:00:00')` 형태로 로컬 시간 기준 처리
 - **`attendance` 수정 시**: 날짜가 `todayStr`이면 `feed`도 반드시 동기화 (수정·삭제·공개토글 모두)
 - **차트 재렌더링**: `weekChart`, `detailChart`는 재렌더링 전 반드시 `.destroy()` 호출
-- **`ADMIN_UID`**: 실제 Firebase UID로 교체 전까지 관리자 기능 비활성화
 - **`renderRanking()`**: 멤버 수만큼 Firestore read 발생. 소규모 모임 전제로 설계됨
