@@ -558,6 +558,7 @@ auth.onAuthStateChanged(async user=>{
       allMembers=snap.docs.map(doc=>doc.data());
       renderMemberFeed();
       renderRanking();
+      if(document.getElementById("tab-profile")?.classList.contains("active")) renderProfile();
     }, e=>console.error("멤버 구독 오류:",e));
 
     // 오늘 전체 출석 구독 → 오늘 탭 피드 + 멤버 탭 출석 상태
@@ -1124,6 +1125,7 @@ async function confirmKickMember(){
     // 3. 멤버 문서 삭제
     batch.delete(db.collection("members").doc(uid));
     await batch.commit();
+    if(currentFeedTab==='all') renderAllFeed();
     closeModal("modalKickMember");
     pendingKickId=null; pendingKickName=null;
   } catch(e){ alert("삭제에 실패했어요: "+e.message); }
