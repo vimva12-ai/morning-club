@@ -809,7 +809,7 @@ function renderStats(){
   const streak=getStreak();
 
   // 이번 달 출석률 계산
-  const thisMonthStr=today.toISOString().slice(0,7);
+  const thisMonthStr=todayStr.slice(0,7);
   const thisMonthRecs=myRecords.filter(r=>r.date.startsWith(thisMonthStr));
   const daysElapsed=today.getDate();
   const possibleDays=Array.from({length:daysElapsed},(_,i)=>{
@@ -820,7 +820,7 @@ function renderStats(){
 
   // 지난 달 출석률 계산
   const lastM=new Date(today.getFullYear(),today.getMonth()-1,1);
-  const lastMonthStr=lastM.toISOString().slice(0,7);
+  const lastMonthStr=dateToLocal(lastM).slice(0,7);
   const lastMonthRecs=myRecords.filter(r=>r.date.startsWith(lastMonthStr));
   const lastMonthDays=new Date(today.getFullYear(),today.getMonth(),0).getDate();
   const lastPossible=Array.from({length:lastMonthDays},(_,i)=>{
@@ -834,17 +834,19 @@ function renderStats(){
     <div class="stat-card"><div class="stat-emoji">📆</div><div class="stat-value">${myRecords.length}일</div><div class="stat-label">나의 총 출석</div></div>
     <div class="stat-card"><div class="stat-emoji">📅</div><div class="stat-value">${monthRate}%</div><div class="stat-label">이번 달 출석률</div></div>`;
 
-  // 주간 차트 — 내 실제 출석 데이터
+  // 주간 차트 — 내 실제 출석 데이터 (이번 주 월요일 기준 +0~+6일)
   const dayOrder=[1,2,3,4,5,6,0];
-  const thisWeekData=dayOrder.map(dayIdx=>{
-    const d=new Date(today);
-    d.setDate(today.getDate()-((todayDay-dayIdx+7)%7));
-    return myRecords.some(r=>r.date===d.toISOString().slice(0,10))?100:0;
+  const mondayOffset=todayDay===0?6:todayDay-1;
+  const thisWeekMonday=new Date(today); thisWeekMonday.setDate(today.getDate()-mondayOffset);
+  const thisWeekData=dayOrder.map((_,i)=>{
+    const d=new Date(thisWeekMonday); d.setDate(thisWeekMonday.getDate()+i);
+    const ds=dateToLocal(d);
+    if(ds>todayStr) return 0;
+    return myRecords.some(r=>r.date===ds)?100:0;
   });
-  const lastWeekData=dayOrder.map(dayIdx=>{
-    const d=new Date(today);
-    d.setDate(today.getDate()-((todayDay-dayIdx+7)%7)-7);
-    return myRecords.some(r=>r.date===d.toISOString().slice(0,10))?100:0;
+  const lastWeekData=dayOrder.map((_,i)=>{
+    const d=new Date(thisWeekMonday); d.setDate(thisWeekMonday.getDate()+i-7);
+    return myRecords.some(r=>r.date===dateToLocal(d))?100:0;
   });
 
   if(weekChart) weekChart.destroy();
@@ -939,7 +941,7 @@ function getFilteredRecords(){
   }
   const cutoff=new Date(today);
   cutoff.setDate(today.getDate()-currentPresetDays+1);
-  const cutoffStr=cutoff.toISOString().slice(0,10);
+  const cutoffStr=dateToLocal(cutoff);
   return myRecords.filter(r=>r.date>=cutoffStr);
 }
 
@@ -980,7 +982,7 @@ function renderDetailStats(){
   // 미니 차트 (날짜별 출석 시각화)
   const last14=Array.from({length:14},(_,i)=>{
     const d=new Date(today); d.setDate(today.getDate()-13+i);
-    const ds=d.toISOString().slice(0,10);
+    const ds=dateToLocal(d);
     return {label:`${d.getMonth()+1}/${d.getDate()}`,val:records.some(r=>r.date===ds)?1:0};
   });
   if(detailChart) detailChart.destroy();
